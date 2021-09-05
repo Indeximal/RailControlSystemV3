@@ -1,92 +1,106 @@
-import random
-from typing import Set, Callable, Any, Iterable
+from .joint import RailJoint
+from .block import RailBlock
 
-from .blocks import RailBlock, TransitRailBlock, CrossingRailBlock, \
-    EndRailBlock, SwitchRailBlock
+def example_usage():
+	loop = (RailNetworkBuilder()
+		.start(0, -1)
+		.mark("start")
+		.track_to(1, 0)
+		.track_to(0, 1)
+		.track_to(-1, 0)
+		.connect_to("start")
+		.build())
+	
+	network = (RailNetworkBuilder()
+		.start(-1, 1)
+		.mark("start")
+		.track_to(0, 0)
+		.split()
+		.track_to(2, 1)
+		.track_to(0, 3)
+		.mark("A")
+		.build_other()
+		.track_to(1, 1)
+		.merge_into("A")
+		.connect_to("start")
+		.build())
+
+	return network
 
 
 class RailNetwork:
-    def __init__(self):
-        self.blocks: Set[RailBlock] = set()
-
-    def add_block(self, block: RailBlock):
-        self.blocks.add(block)
-
-    def add_blocks(self, blocks: Iterable[RailBlock]):
-        self.blocks.update(blocks)
-
-    @staticmethod
-    def link(first_linker: Callable[[RailBlock], Any],
-             second_linker: Callable[[RailBlock], Any]):
-        """This function takes two bound linker methods and links the blocks"""
-        first_block: RailBlock = first_linker.__self__
-        second_block: RailBlock = second_linker.__self__
-        first_linker(second_block)
-        second_linker(first_block)
-
-    def link_with_transit(self, first_linker: Callable[[RailBlock], Any],
-             second_linker: Callable[[RailBlock], Any]) -> TransitRailBlock:
-        """This function takes two bound linker methods and links the blocks
-           with a transit block in between.
-        """
-        first_block: RailBlock = first_linker.__self__
-        second_block: RailBlock = second_linker.__self__
-        new_center = ((first_block.center[0] + second_block.center[0]) / 2,
-                      (first_block.center[1] + second_block.center[1]) / 2)
-        transit_block = TransitRailBlock(new_center)
-        self.add_block(transit_block)
-        self.link(first_linker, transit_block.set_a_link)
-        self.link(second_linker, transit_block.set_b_link)
-        return transit_block
-
-    # def cross_transit_blocks(self):
-    #     pass
+	def __init__(self):
+		self.joint_connections_right = dict()
+		self.joint_connections_left = dict()
+		self.blocks = list()
+		
+	def connect(self, joint_a: RailJoint, joint_b: RailJoint) -> RailBlock:
+		block = RailBlock(joint_a, joint_b)
+		# TODO: maybe implement this?
+		return block
+			
 
 
-def random_railyard(width, height, margin):
-    """This function can generate a network that looks like a railyard"""
-    network = RailNetwork()
-    Y_Lanes = list(range(2 * margin, height - 2 * margin, 50))
-    end_nodes_left = [EndRailBlock((margin, y)) for y in Y_Lanes]
-    end_nodes_right = [EndRailBlock((width - margin, y)) for y in Y_Lanes]
-    network.add_blocks(end_nodes_right)
-    network.add_blocks(end_nodes_left)
+class RailNetworkBuilder:
+	def __init__(self):
+		self.network: RailNetwork = RailNetwork()
+		self.prev_joint = None
+		self.prev_track = None
+		self.marks = dict()
+	
+	def start(self, x: float, y: float):
+		self.prev_joint = RailJoint(x, y, 0)
+		return self
+		
+	def mark(self, mark_name: str):
+		self.marks[mark_name] = self.prev_joint
+		return self
+		
+	def track_to(self, x: float, y: float):
+		joint = RailJoint(x, y, 0)
+		track = RailBlock(self.prev_joint, joint)
+		
+		if self.prev_track:
+			self.prev_track.b_connections.append(track)
+			track.a_connections = [self.prev_track]
+			
+		self.network.blocks.append(track)
+		
+		self.prev_joint = joint
+		self.prev_track = track
+		return self
+		
+	def connect_to(self, mark_name: str):
+		joint = self.marks[mark_name]
+		track = RailBlock(self.prev_joint, joint)
+		
+		if self.prev_track:
+			self.prev_track.b_connections.append(track)
+			track.a_connections = [self.prev_track]
+			
 
-    X = list(range(margin + 50, width - margin, 50))
-    print()
-    SWITCHES = [random.randint(1, len(Y_Lanes) - 1) for _ in X]
-    S_DIR = [random.choice([1, -1]) for _ in X]
-    switches_bottom = [SwitchRailBlock(
-        (X[i], Y_Lanes[SWITCHES[i]])) for i in range(len(X))]
-    switches_top = [SwitchRailBlock((X[i] + S_DIR[i] * 20,
-                                     Y_Lanes[SWITCHES[i] - 1]))
-                    for i in range(len(X))]
+		next_track = None
+		for block in self.network.blocks:
+			if joint == block.a_joint:
+				next_track = block
+				break
+		
+		if not next_track:
+			raise Exception("Coundn't find track to connect to")
+	
+		track.b_connections = [next_track]
+		next_track.a_connections.append(track)		
+			
+		self.network.blocks.append(track)
+		
+		self.prev_joint = None
+		self.prev_track = None
+		return self
+		
+	def build(self):
+		return self.network
+	
+		
+	
 
-    network.add_blocks(switches_bottom)
-    network.add_blocks(switches_top)
-
-    # Connect the switches with each other
-    for switch_top, switch_bottom in zip(switches_top, switches_bottom):
-        network.link(switch_top.add_b_link, switch_bottom.add_b_link)
-
-    # Connect the lanes
-    for lane in range(len(Y_Lanes)):
-        last_link = end_nodes_left[lane].set_a_link
-        for i in range(len(X)):
-            if SWITCHES[i] == lane + 1:
-                if S_DIR[i] == -1:
-                    network.link_with_transit(last_link, switches_top[i].set_a_link)
-                    last_link = switches_top[i].add_b_link
-                elif S_DIR[i] == 1:
-                    network.link_with_transit(last_link, switches_top[i].add_b_link)
-                    last_link = switches_top[i].set_a_link
-            if SWITCHES[i] == lane:
-                if S_DIR[i] == 1:
-                    network.link_with_transit(last_link, switches_bottom[i].set_a_link)
-                    last_link = switches_bottom[i].add_b_link
-                elif S_DIR[i] == -1:
-                    network.link_with_transit(last_link, switches_bottom[i].add_b_link)
-                    last_link = switches_bottom[i].set_a_link
-        network.link_with_transit(last_link, end_nodes_right[lane].set_a_link)
-
-    return network
+	
