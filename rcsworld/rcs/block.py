@@ -1,12 +1,12 @@
 from typing import List, Optional
 
-from .joint import RailJoint
+from .point import DirectedPoint
 
 
 class RailBlock:
-	def __init__(self, a_joint: RailJoint, b_joint: RailJoint):
-		self.a_joint: RailJoint = a_joint
-		self.b_joint: RailJoint = b_joint
+	def __init__(self, a_point: DirectedPoint, b_point: DirectedPoint):
+		self.a_point: DirectedPoint = a_point
+		self.b_point: DirectedPoint = b_point
 		self.a_connections: List(RailBlock) = list()
 		self.b_connections: List(RailBlock) = list()
 		

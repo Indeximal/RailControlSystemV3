@@ -1,4 +1,4 @@
-from .joint import RailJoint
+from .point import DirectedPoint
 from .block import RailBlock
 
 def example_usage():
@@ -21,7 +21,7 @@ def example_usage():
 		.mark("A")
 		.build_other()
 		.track_to(1, 1)
-		.merge_into("A")
+		.merge_into("A")  # the rail doesn't actually exist yet
 		.connect_to("start")
 		.build())
 
@@ -30,12 +30,12 @@ def example_usage():
 
 class RailNetwork:
 	def __init__(self):
-		self.joint_connections_right = dict()
-		self.joint_connections_left = dict()
+		self.point_connections_right = dict()
+		self.point_connections_left = dict()
 		self.blocks = list()
 		
-	def connect(self, joint_a: RailJoint, joint_b: RailJoint) -> RailBlock:
-		block = RailBlock(joint_a, joint_b)
+	def connect(self, point_a: DirectedPoint, point_b: DirectedPoint) -> RailBlock:
+		block = RailBlock(point_a, point_b)
 		# TODO: maybe implement this?
 		return block
 			
@@ -44,21 +44,21 @@ class RailNetwork:
 class RailNetworkBuilder:
 	def __init__(self):
 		self.network: RailNetwork = RailNetwork()
-		self.prev_joint = None
+		self.prev_point = None
 		self.prev_track = None
 		self.marks = dict()
 	
 	def start(self, x: float, y: float):
-		self.prev_joint = RailJoint(x, y, 0)
+		self.prev_point = DirectedPoint((x, y), (0, 0))
 		return self
 		
 	def mark(self, mark_name: str):
-		self.marks[mark_name] = self.prev_joint
+		self.marks[mark_name] = self.prev_point
 		return self
 		
 	def track_to(self, x: float, y: float):
-		joint = RailJoint(x, y, 0)
-		track = RailBlock(self.prev_joint, joint)
+		point = DirectedPoint((x, y), (0, 0))
+		track = RailBlock(self.prev_point.opposite(), point)
 		
 		if self.prev_track:
 			self.prev_track.b_connections.append(track)
@@ -66,13 +66,13 @@ class RailNetworkBuilder:
 			
 		self.network.blocks.append(track)
 		
-		self.prev_joint = joint
+		self.prev_point = point
 		self.prev_track = track
 		return self
 		
 	def connect_to(self, mark_name: str):
-		joint = self.marks[mark_name]
-		track = RailBlock(self.prev_joint, joint)
+		point = self.marks[mark_name]
+		track = RailBlock(self.prev_point.opposite(), point)
 		
 		if self.prev_track:
 			self.prev_track.b_connections.append(track)
@@ -81,7 +81,7 @@ class RailNetworkBuilder:
 
 		next_track = None
 		for block in self.network.blocks:
-			if joint == block.a_joint:
+			if point == block.a_point:
 				next_track = block
 				break
 		
@@ -93,7 +93,7 @@ class RailNetworkBuilder:
 			
 		self.network.blocks.append(track)
 		
-		self.prev_joint = None
+		self.prev_point = None
 		self.prev_track = None
 		return self
 		
