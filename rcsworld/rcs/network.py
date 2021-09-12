@@ -49,7 +49,7 @@ class RailNetworkBuilder:
 		self.marks = dict()
 	
 	def start(self, x: float, y: float):
-		self.prev_point = DirectedPoint((x, y), (0, 0))
+		self.prev_point = DirectedPoint((x, y), (0.5, 0))
 		return self
 		
 	def mark(self, mark_name: str):
@@ -57,7 +57,7 @@ class RailNetworkBuilder:
 		return self
 		
 	def track_to(self, x: float, y: float):
-		point = DirectedPoint((x, y), (0, 0))
+		point = DirectedPoint((x, y), (0.5, 0))
 		track = RailBlock(self.prev_point.opposite(), point)
 		
 		if self.prev_track:
@@ -71,6 +71,7 @@ class RailNetworkBuilder:
 		return self
 		
 	def connect_to(self, mark_name: str):
+		raise NotImplementedError("todo: fix the mark system, to be based on tracks not points")
 		point = self.marks[mark_name]
 		track = RailBlock(self.prev_point.opposite(), point)
 		
